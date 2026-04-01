@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# SvelteKit
+.svelte-kit/
+
+# Build output
+build/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Demos (built WASM, copied by build script)
+static/demos/
+
+# Generated files (created by build script)
+src/lib/manifest.json
+src/lib/search-index.json

@@ -1,0 +1,131 @@
+<script lang="ts">
+	import { page } from '$app/state';
+	import { slide } from 'svelte/transition';
+	import { docsNavigation } from '$lib/config/navigation';
+	import { docsUiConfig } from '$lib/config/docs-ui';
+	import { siteConfig } from '$lib/config/site';
+	import { cn } from '$lib/utils/cn';
+	import SearchTrigger from '$lib/components/docs/search/SearchTrigger.svelte';
+	import ScrollArea from '$lib/components/ui/ScrollArea.svelte';
+	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
+	import ChevronRight from 'carbon-icons-svelte/lib/ChevronRight.svelte';
+	import LogoGithub from 'carbon-icons-svelte/lib/LogoGithub.svelte';
+
+	const currentPath = $derived(
+		page.url.pathname.length > 1 ? page.url.pathname.replace(/\/+$/, '') : page.url.pathname
+	);
+	const githubUrl = siteConfig.links.github;
+
+	let expandedGroupOverrides = $state<Record<string, boolean>>({});
+
+	const docHref = (slug: string) => (slug ? `/${slug}` : '/');
+
+	const autoExpandedGroups = $derived.by<Record<string, boolean>>(() => {
+		const expanded: Record<string, boolean> = {};
+		for (const doc of docsNavigation) {
+			if (doc.items?.length) {
+				expanded[doc.slug] = doc.items.some((item) => docHref(item.slug) === currentPath);
+			}
+		}
+		return expanded;
+	});
+
+	function isGroupActive(slug: string) {
+		return expandedGroupOverrides[slug] ?? autoExpandedGroups[slug] ?? false;
+	}
+
+	function toggleGroup(slug: string) {
+		expandedGroupOverrides[slug] = !isGroupActive(slug);
+	}
+</script>
+
+<aside class="flex h-dvh flex-col bg-background" aria-label="Documentation sidebar">
+	<div class="flex flex-col gap-4 p-4">
+		<a href="/" class="flex items-center gap-2">
+			<span class="text-xl font-medium tracking-tight text-foreground">{siteConfig.name}</span>
+		</a>
+		<SearchTrigger />
+	</div>
+
+	<ScrollArea
+		class="flex-1"
+		viewportClass="p-4"
+		viewportStyle="mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent); -webkit-mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent);"
+	>
+		<nav class="flex flex-col space-y-1" aria-label="Documentation pages">
+			<h4 class="mb-2 ml-2 text-xs font-medium tracking-wide text-foreground-muted/70 uppercase">
+				{docsUiConfig.sidebar.navigationLabel}
+			</h4>
+			{#each docsNavigation as doc (doc.slug)}
+				{#if doc.items?.length}
+					{@const groupIsActive = isGroupActive(doc.slug)}
+					<button
+						onclick={() => toggleGroup(doc.slug)}
+						class={cn(
+							'flex w-full items-center justify-between rounded-sm px-3 py-1.5 text-sm font-medium tracking-normal transition-all duration-150 ease-out hover:bg-background-muted hover:text-foreground',
+							groupIsActive ? 'text-foreground' : 'text-foreground-muted'
+						)}
+					>
+						<span>{doc.name}</span>
+						<ChevronRight
+							class={cn('size-4 transition-transform duration-150', groupIsActive && 'rotate-90')}
+						/>
+					</button>
+					{#if groupIsActive}
+						<div
+							transition:slide={{ duration: 220 }}
+							class="relative flex flex-col gap-1 overflow-hidden pl-5 before:absolute before:top-1 before:bottom-1 before:left-3 before:w-px before:bg-border"
+						>
+							{#each doc.items as item (item.slug)}
+								{@const href = docHref(item.slug)}
+								{@const isActive = currentPath === href}
+								<a
+									{href}
+									class={cn(
+										'block rounded-sm px-3 py-1.5 text-sm font-medium tracking-normal transition-all duration-150 ease-out',
+										isActive
+											? 'bg-accent/10 text-accent'
+											: 'text-foreground-muted hover:bg-background-muted hover:text-foreground'
+									)}
+								>
+									{item.name}
+								</a>
+							{/each}
+						</div>
+					{/if}
+				{:else}
+					{@const href = docHref(doc.slug)}
+					{@const isActive = currentPath === href}
+					<a
+						{href}
+						class={cn(
+							'block rounded-sm px-3 py-1.5 text-sm tracking-normal transition-all duration-150 ease-out',
+							isActive
+								? 'bg-accent/10 text-accent'
+								: 'text-foreground-muted hover:bg-background-muted hover:text-foreground'
+						)}
+					>
+						{doc.name}
+					</a>
+				{/if}
+			{/each}
+		</nav>
+	</ScrollArea>
+
+	<div class="flex items-center gap-1 p-4">
+		{#if docsUiConfig.sidebar.showThemeToggle}
+			<ThemeToggle />
+		{/if}
+		{#if docsUiConfig.sidebar.showRepositoryLink && githubUrl}
+			<a
+				class="group transition-scale inset-shadow relative inline-flex size-7 cursor-pointer items-center justify-center rounded-sm bg-background-inset text-foreground duration-150 ease-out active:scale-[0.95]"
+				href={githubUrl}
+				target="_blank"
+				rel="noreferrer"
+				aria-label="Open project repository (opens in a new tab)"
+			>
+				<LogoGithub class="size-4 flex-none" />
+			</a>
+		{/if}
+	</div>
+</aside>

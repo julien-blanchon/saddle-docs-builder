@@ -1,0 +1,124 @@
+name: Build & Deploy Crate Docs
+
+on:
+  workflow_call:
+    inputs:
+      crate-dir:
+        description: 'Path to the Bevy crate root (relative to repo root)'
+        required: false
+        default: '.'
+        type: string
+      template-ref:
+        description: 'Git ref for the docs-template repo'
+        required: false
+        default: 'main'
+        type: string
+      template-repo:
+        description: 'Owner/repo of the docs-template'
+        required: false
+        default: ''
+        type: string
+      skip-wasm:
+        description: 'Skip WASM demo builds (useful for docs-only updates)'
+        required: false
+        default: false
+        type: boolean
+      deploy-branch:
+        description: 'Branch to deploy built site to'
+        required: false
+        default: 'pages'
+        type: string
+      parallel-wasm:
+        description: 'Number of parallel WASM builds'
+        required: false
+        default: '4'
+        type: string
+      rust-toolchain:
+        description: 'Rust toolchain to use'
+        required: false
+        default: 'stable'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout crate repository
+        uses: actions/checkout@v4
+
+      - name: Checkout docs-template
+        uses: actions/checkout@v4
+        if: inputs.template-repo != ''
+        with:
+          repository: ${{ inputs.template-repo }}
+          ref: ${{ inputs.template-ref }}
+          path: _docs-template
+
+      - name: Use local docs-template
+        if: inputs.template-repo == ''
+        run: |
+          if [ -d "docs-template" ]; then
+            cp -r docs-template _docs-template
+          else
+            echo "ERROR: No docs-template/ directory found and no template-repo specified"
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        if: inputs.skip-wasm == false
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust-toolchain }}
+          targets: wasm32-unknown-unknown
+
+      - name: Install system dependencies
+        if: inputs.skip-wasm == false
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libasound2-dev libudev-dev libwayland-dev g++ pkg-config
+
+      - name: Install bevy CLI
+        if: inputs.skip-wasm == false
+        run: cargo install --git https://github.com/TheBevyFlock/bevy_cli --locked bevy_cli
+
+      - name: Restore Rust cache
+        if: inputs.skip-wasm == false
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: docs-wasm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install site dependencies
+        run: cd _docs-template/site && bun install
+
+      - name: Build docs site
+        env:
+          CRATE_DIR: ${{ github.workspace }}/${{ inputs.crate-dir }}
+          SITE_DIR: ${{ github.workspace }}/_docs-template/site
+          SKIP_WASM: ${{ inputs.skip-wasm && '1' || '0' }}
+          PARALLEL: ${{ inputs.parallel-wasm }}
+        run: |
+          cd _docs-template
+          bun run build.ts --crate-dir "$CRATE_DIR"
+
+      - name: Deploy to pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: ${{ inputs.deploy-branch }}
+          publish_dir: _docs-template/site/build
+          force_orphan: true
+          commit_message: 'deploy: ${{ github.sha }}'
