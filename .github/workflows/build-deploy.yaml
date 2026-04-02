@@ -158,26 +158,3 @@ jobs:
           publish_dir: _docs-template/site/build
           force_orphan: true
           commit_message: 'deploy: ${{ github.sha }}'
-
-  set-homepage:
-    runs-on: ubuntu-latest
-    needs: build-deploy
-    steps:
-      - name: Update repo homepage to Pages URL
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          OWNER="${{ github.repository_owner }}"
-          REPO="${{ github.event.repository.name }}"
-
-          if [ "$REPO" = "${OWNER}.github.io" ]; then
-            URL="https://${OWNER}.github.io/"
-          else
-            URL="https://${OWNER}.github.io/${REPO}/"
-          fi
-
-          gh api \
-            --method PATCH \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${OWNER}/${REPO}" \
-            -f homepage="$URL"
