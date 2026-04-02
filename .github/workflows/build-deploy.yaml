@@ -59,10 +59,10 @@ jobs:
     steps:
       # ── Checkout ──────────────────────────────────────────────────────────
       - name: Checkout crate repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout docs-template
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         if: inputs.template-repo != ''
         with:
           repository: ${{ inputs.template-repo }}
@@ -113,9 +113,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: docs-wasm-${{ inputs.rust-toolchain }}
-          # Cache the examples workspace target dir too
           cache-directories: |
-            ${{ github.workspace }}/${{ inputs.crate-dir }}/examples/target
+            examples/target
 
       # Cache wasm-opt / wasm-bindgen binaries (installed by bevy CLI on first use)
       - name: Cache wasm tools
@@ -165,3 +164,26 @@ jobs:
           publish_dir: _docs-template/site/build
           force_orphan: true
           commit_message: 'deploy: ${{ github.sha }}'
+
+  set-homepage:
+    runs-on: ubuntu-latest
+    needs: build-deploy
+    steps:
+      - name: Update repo homepage to Pages URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          REPO="${{ github.event.repository.name }}"
+
+          if [ "$REPO" = "${OWNER}.github.io" ]; then
+            URL="https://${OWNER}.github.io/"
+          else
+            URL="https://${OWNER}.github.io/${REPO}/"
+          fi
+
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${OWNER}/${REPO}" \
+            -f homepage="$URL"
