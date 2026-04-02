@@ -1,4 +1,5 @@
 import type { DocItem } from '../types/doc';
+import { base } from '$app/paths';
 import { docsNavigation } from '$lib/config/navigation';
 
 const flattenNavigationToManifest = (items: DocItem[], parentCategory?: string): DocItem[] => {
@@ -30,7 +31,7 @@ export const getDocBySlug = (slug: string) => {
 };
 
 export const getDocHref = (slug: string) => {
-	return slug ? `/${slug}` : '/';
+	return slug ? `${base}/${slug}` : `${base}/`;
 };
 
 export const getAdjacentDocs = (slug: string) => {

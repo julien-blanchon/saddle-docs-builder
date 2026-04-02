@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { onDestroy } from 'svelte';
 	import DocsSidebar from './DocsSidebar.svelte';
 	import { siteConfig } from '$lib/config/site';
@@ -52,7 +53,7 @@
 <div
 	class="fixed inset-x-0 top-0 z-50 flex items-center justify-between border-b border-border bg-background px-4 py-1.5 lg:hidden"
 >
-	<a href="/" class="inline-flex items-center gap-1 px-2 py-2 text-sm tracking-tight text-foreground">
+	<a href="{base}/" class="inline-flex items-center gap-1 px-2 py-2 text-sm tracking-tight text-foreground">
 		<span class="font-medium tracking-tight text-foreground">{siteConfig.name}</span>
 	</a>
 	<button

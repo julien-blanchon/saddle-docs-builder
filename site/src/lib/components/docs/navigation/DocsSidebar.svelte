@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { base } from '$app/paths';
 	import { slide } from 'svelte/transition';
 	import { docsNavigation } from '$lib/config/navigation';
 	import { docsUiConfig } from '$lib/config/docs-ui';
@@ -18,7 +19,7 @@
 
 	let expandedGroupOverrides = $state<Record<string, boolean>>({});
 
-	const docHref = (slug: string) => (slug ? `/${slug}` : '/');
+	const docHref = (slug: string) => (slug ? `${base}/${slug}` : `${base}/`);
 
 	const autoExpandedGroups = $derived.by<Record<string, boolean>>(() => {
 		const expanded: Record<string, boolean> = {};
@@ -41,7 +42,7 @@
 
 <aside class="flex h-dvh flex-col bg-background" aria-label="Documentation sidebar">
 	<div class="flex flex-col gap-4 p-4">
-		<a href="/" class="flex items-center gap-2">
+		<a href="{base}/" class="flex items-center gap-2">
 			<span class="text-xl font-medium tracking-tight text-foreground">{siteConfig.name}</span>
 		</a>
 		<SearchTrigger />

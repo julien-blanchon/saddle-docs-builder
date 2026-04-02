@@ -390,7 +390,17 @@ if (!skipSite) {
   if (!existsSync(nodeModules)) {
     await $`bun install --cwd ${siteDir}`.quiet();
   }
-  $.env({ ...process.env, CRATE_DIR: crateDir });
+  // Derive BASE_PATH for GitHub Pages project sites.
+  // GITHUB_REPOSITORY is "owner/repo" in CI — we extract "/repo".
+  // Can also be set explicitly via BASE_PATH env var.
+  let basePath = process.env.BASE_PATH || "";
+  if (!basePath && process.env.GITHUB_REPOSITORY) {
+    const repoName = process.env.GITHUB_REPOSITORY.split("/")[1];
+    if (repoName) basePath = `/${repoName}`;
+  }
+  if (basePath) console.log(`  BASE_PATH: ${basePath}`);
+
+  $.env({ ...process.env, CRATE_DIR: crateDir, BASE_PATH: basePath });
   await $`bun run --cwd ${siteDir} build`;
   console.log(`\n=== Build complete: ${siteDir}/build/ ===`);
 } else {

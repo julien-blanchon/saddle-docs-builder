@@ -9,11 +9,12 @@
 	import Minimize from 'carbon-icons-svelte/lib/Minimize.svelte';
 
 	import { browser } from '$app/environment';
+	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
 	import WarningAlt from 'carbon-icons-svelte/lib/WarningAlt.svelte';
 
 	const { data } = $props();
-	const demoSrc = $derived(`/demos/${data.name}/index.html`);
+	const demoSrc = $derived(`${base}/demos/${data.name}/index.html`);
 
 	// Native canvas resolution — Bevy renders at this fixed size
 	const NATIVE_W = 1440;
@@ -48,7 +49,7 @@
 	}
 
 	$effect(() => {
-		checkDemo(`/demos/${data.name}/index.html`);
+		checkDemo(`${base}/demos/${data.name}/index.html`);
 	});
 
 	onMount(() => {

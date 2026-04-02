@@ -4,8 +4,8 @@
 	import { searchDocs } from '$lib/utils/search';
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
-	import { goto } from '$app/navigation';
-	import { onNavigate } from '$app/navigation';
+	import { goto, onNavigate } from '$app/navigation';
+	import { base } from '$app/paths';
 	import { cn } from '$lib/utils/cn';
 	import ScrollArea from '$lib/components/ui/ScrollArea.svelte';
 	import { onMount, tick } from 'svelte';
@@ -143,7 +143,7 @@
 	}
 
 	function selectResult(result: ReturnType<typeof searchDocs>[number]) {
-		const href = `${result.slug}${result.anchor || ''}`;
+		const href = `${base}${result.slug}${result.anchor || ''}`;
 		goto(href);
 		close();
 	}
