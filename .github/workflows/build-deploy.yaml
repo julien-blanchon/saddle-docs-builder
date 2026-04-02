@@ -89,17 +89,19 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             libasound2-dev libudev-dev libwayland-dev g++ pkg-config
 
-      # Cache bevy CLI binary separately — it rarely changes
-      - name: Cache bevy CLI
+      # Cache cargo bin (bevy CLI + wasm-bindgen installed by bevy CLI)
+      - name: Cache cargo bin
         if: inputs.skip-wasm == false
-        id: cache-bevy-cli
+        id: cache-cargo-bin
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/bin/bevy
-          key: bevy-cli-${{ runner.os }}-${{ inputs.rust-toolchain }}
+          path: ~/.cargo/bin
+          key: cargo-bin-${{ runner.os }}-${{ inputs.rust-toolchain }}
+          restore-keys: |
+            cargo-bin-${{ runner.os }}-
 
       - name: Install bevy CLI
-        if: inputs.skip-wasm == false && steps.cache-bevy-cli.outputs.cache-hit != 'true'
+        if: inputs.skip-wasm == false && steps.cache-cargo-bin.outputs.cache-hit != 'true'
         run: cargo install --git https://github.com/TheBevyFlock/bevy_cli --locked bevy_cli
 
       # Cache Rust compilation artifacts — keyed on lockfile + toolchain
@@ -110,16 +112,6 @@ jobs:
           shared-key: docs-wasm-${{ inputs.rust-toolchain }}
           cache-directories: |
             examples/target
-
-      # Cache wasm-opt / wasm-bindgen binaries (installed by bevy CLI on first use)
-      - name: Cache wasm tools
-        if: inputs.skip-wasm == false
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/.wasm-pack
-            ~/.cache/wasm-opt*
-          key: wasm-tools-${{ runner.os }}
 
       # ── Bun + site dependencies ───────────────────────────────────────────
       - name: Setup Bun
