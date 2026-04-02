@@ -28,11 +28,6 @@ on:
         required: false
         default: 'pages'
         type: string
-      parallel-wasm:
-        description: 'Number of parallel WASM builds'
-        required: false
-        default: '4'
-        type: string
       rust-toolchain:
         description: 'Rust toolchain to use'
         required: false
@@ -150,7 +145,6 @@ jobs:
           CRATE_DIR: ${{ github.workspace }}/${{ inputs.crate-dir }}
           SITE_DIR: ${{ github.workspace }}/_docs-template/site
           SKIP_WASM: ${{ inputs.skip-wasm && '1' || '0' }}
-          PARALLEL: ${{ inputs.parallel-wasm }}
         run: |
           cd _docs-template
           bun run build.ts --crate-dir "$CRATE_DIR"

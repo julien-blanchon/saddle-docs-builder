@@ -22,7 +22,6 @@ const scriptDir = dirname(new URL(import.meta.url).pathname);
 let siteDir = process.env.SITE_DIR || join(scriptDir, "site");
 let skipWasm = process.env.SKIP_WASM === "1";
 let skipSite = process.env.SKIP_SITE === "1";
-let parallel = parseInt(process.env.PARALLEL || "4", 10);
 
 for (let i = 0; i < args.length; i++) {
   switch (args[i]) {
@@ -34,9 +33,6 @@ for (let i = 0; i < args.length; i++) {
       break;
     case "--skip-site":
       skipSite = true;
-      break;
-    case "--parallel":
-      parallel = parseInt(args[++i], 10);
       break;
     default:
       console.error(`Unknown option: ${args[i]}`);
@@ -168,65 +164,67 @@ if (existsSync(docsDir)) {
 }
 console.log(`  Docs: ${docs.length > 0 ? docs.join(", ") : "none"}`);
 
-// ── 2. Build WASM demos (parallel) ─────────────────────────────────────────
+// ── 2. Build WASM demos (sequential) ───────────────────────────────────────
+//
+// Built sequentially so all examples share the cargo compilation cache.
+// The first example compiles Bevy + deps (~8-10 min on cold cache),
+// subsequent examples only compile their own code (~30s each).
+// Parallel builds duplicate dependency compilation and are slower.
 
 if (!skipWasm && examples.length > 0) {
-  console.log(`\n--- Building WASM demos (parallel=${parallel}) ---`);
+  console.log(`\n--- Building WASM demos (${examples.length} examples, sequential) ---`);
   await mkdir(demosDir, { recursive: true });
 
-  // Build in batches of `parallel`
-  for (let i = 0; i < examples.length; i += parallel) {
-    const batch = examples.slice(i, i + parallel);
-    const results = await Promise.allSettled(
-      batch.map(async (example) => {
-        const info = examplePackages.get(example)!;
-        console.log(`  Building: ${example}`);
+  for (const example of examples) {
+    const info = examplePackages.get(example)!;
+    const start = Date.now();
+    console.log(`  Building: ${example}`);
 
-        try {
-          // bevy CLI doesn't support --manifest-path, so we set the cwd
-          // For inner-workspace examples, cwd is the examples/ dir
-          // For [[example]] targets, cwd is the crate root
-          const buildCwd =
-            info.type === "package" && existsSync(join(crateDir, "examples", "Cargo.toml"))
-              ? join(crateDir, "examples")
-              : crateDir;
+    try {
+      // bevy CLI doesn't support --manifest-path, so we set the cwd
+      // For inner-workspace examples, cwd is the examples/ dir
+      // For [[example]] targets, cwd is the crate root
+      const buildCwd =
+        info.type === "package" && existsSync(join(crateDir, "examples", "Cargo.toml"))
+          ? join(crateDir, "examples")
+          : crateDir;
 
-          if (info.type === "package") {
-            await $`bevy build -p ${info.name} --release --yes web --bundle`.cwd(buildCwd).quiet();
-          } else {
-            await $`bevy build --example ${info.name} --release --yes web --bundle`.cwd(buildCwd).quiet();
+      if (info.type === "package") {
+        await $`bevy build -p ${info.name} --release --yes web --bundle`.cwd(buildCwd).quiet();
+      } else {
+        await $`bevy build --example ${info.name} --release --yes web --bundle`.cwd(buildCwd).quiet();
+      }
+
+      // Find the bundle — check the target dir relative to build cwd
+      const searchDirs = [
+        join(buildCwd, "target/bevy_web/web-release"),
+        join(crateDir, "target/bevy_web/web-release"),
+      ];
+      let bundlePath: string | null = null;
+      for (const dir of searchDirs) {
+        for (const name of [info.name, example]) {
+          const candidate = join(dir, name);
+          if (existsSync(candidate)) {
+            bundlePath = candidate;
+            break;
           }
-
-          // Find the bundle — check the target dir relative to build cwd
-          const searchDirs = [
-            join(buildCwd, "target/bevy_web/web-release"),
-            join(crateDir, "target/bevy_web/web-release"),
-          ];
-          let bundlePath: string | null = null;
-          for (const dir of searchDirs) {
-            for (const name of [info.name, example]) {
-              const candidate = join(dir, name);
-              if (existsSync(candidate)) {
-                bundlePath = candidate;
-                break;
-              }
-            }
-            if (bundlePath) break;
-          }
-
-          if (bundlePath) {
-            const dest = join(demosDir, example);
-            await rm(dest, { recursive: true, force: true });
-            await cp(bundlePath, dest, { recursive: true });
-            console.log(`    -> demos/${example}/`);
-          } else {
-            console.warn(`    [WARN] Bundle not found for ${example}`);
-          }
-        } catch (e) {
-          console.warn(`    [WARN] WASM build failed for ${example}: ${e instanceof Error ? e.message : "unknown error"}`);
         }
-      })
-    );
+        if (bundlePath) break;
+      }
+
+      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+      if (bundlePath) {
+        const dest = join(demosDir, example);
+        await rm(dest, { recursive: true, force: true });
+        await cp(bundlePath, dest, { recursive: true });
+        console.log(`    -> demos/${example}/ (${elapsed}s)`);
+      } else {
+        console.warn(`    [WARN] Bundle not found for ${example} (${elapsed}s)`);
+      }
+    } catch (e) {
+      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+      console.warn(`    [WARN] WASM build failed for ${example} (${elapsed}s): ${e instanceof Error ? e.message : "unknown error"}`);
+    }
   }
 } else {
   console.log("\n--- Skipping WASM builds ---");
