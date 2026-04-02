@@ -89,22 +89,10 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             libasound2-dev libudev-dev libwayland-dev g++ pkg-config
 
-      # Cache cargo bin (bevy CLI + wasm-bindgen installed by bevy CLI)
-      - name: Cache cargo bin
-        if: inputs.skip-wasm == false
-        id: cache-cargo-bin
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin
-          key: cargo-bin-${{ runner.os }}-${{ inputs.rust-toolchain }}
-          restore-keys: |
-            cargo-bin-${{ runner.os }}-
-
-      - name: Install bevy CLI
-        if: inputs.skip-wasm == false && steps.cache-cargo-bin.outputs.cache-hit != 'true'
-        run: cargo install --git https://github.com/TheBevyFlock/bevy_cli --locked bevy_cli
-
       # Cache Rust compilation artifacts — keyed on lockfile + toolchain
+      # IMPORTANT: Swatinem/rust-cache must be set up BEFORE actions/cache for cargo-bin.
+      # POST steps run in reverse setup order, so actions/cache saves ~/.cargo/bin
+      # BEFORE Swatinem/rust-cache cleans it.
       - name: Restore Rust cache
         if: inputs.skip-wasm == false
         uses: Swatinem/rust-cache@v2
@@ -112,6 +100,28 @@ jobs:
           shared-key: docs-wasm-${{ inputs.rust-toolchain }}
           cache-directories: |
             examples/target
+
+      # Cache cargo bin (bevy CLI + wasm-bindgen installed by bevy CLI)
+      # Key includes v2 to bust previously corrupted caches.
+      - name: Cache cargo bin
+        if: inputs.skip-wasm == false
+        id: cache-cargo-bin
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: cargo-bin-v2-${{ runner.os }}-${{ inputs.rust-toolchain }}
+          restore-keys: |
+            cargo-bin-v2-${{ runner.os }}-
+
+      - name: Install bevy CLI
+        if: inputs.skip-wasm == false
+        run: |
+          if ! command -v bevy &>/dev/null; then
+            echo "bevy CLI not found, installing..."
+            cargo install --git https://github.com/TheBevyFlock/bevy_cli --locked bevy_cli
+          else
+            echo "bevy CLI found: $(bevy --version)"
+          fi
 
       # ── Bun + site dependencies ───────────────────────────────────────────
       - name: Setup Bun

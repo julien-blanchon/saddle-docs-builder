@@ -190,9 +190,9 @@ if (!skipWasm && examples.length > 0) {
           : crateDir;
 
       if (info.type === "package") {
-        await $`bevy build -p ${info.name} --release --yes web --bundle`.cwd(buildCwd).quiet();
+        await $`bevy build -p ${info.name} --release --yes web --bundle`.cwd(buildCwd);
       } else {
-        await $`bevy build --example ${info.name} --release --yes web --bundle`.cwd(buildCwd).quiet();
+        await $`bevy build --example ${info.name} --release --yes web --bundle`.cwd(buildCwd);
       }
 
       // Find the bundle — check the target dir relative to build cwd
@@ -221,9 +221,15 @@ if (!skipWasm && examples.length > 0) {
       } else {
         console.warn(`    [WARN] Bundle not found for ${example} (${elapsed}s)`);
       }
-    } catch (e) {
+    } catch (e: any) {
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-      console.warn(`    [WARN] WASM build failed for ${example} (${elapsed}s): ${e instanceof Error ? e.message : "unknown error"}`);
+      const msg = e instanceof Error ? e.message : "unknown error";
+      console.warn(`    [WARN] WASM build failed for ${example} (${elapsed}s): ${msg}`);
+      // Log stderr if available (Bun ShellError)
+      if (e?.stderr) {
+        const stderr = typeof e.stderr === "string" ? e.stderr : new TextDecoder().decode(e.stderr);
+        if (stderr.trim()) console.warn(`    stderr: ${stderr.trim().split("\n").join("\n    stderr: ")}`);
+      }
     }
   }
 } else {
