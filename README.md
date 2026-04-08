@@ -4,6 +4,7 @@ Auto-generated documentation site for Bevy crates. Point it at any Rust crate wi
 
 - Server-rendered markdown (Shiki syntax highlighting, dual light/dark themes)
 - Interactive WASM demos (parallel builds via `bevy build`)
+- Automatic skipping of demo bundles that exceed GitHub's 100 MiB file limit
 - Full-text search (Cmd+K)
 - "On this page" table of contents with scroll tracking
 - Copy as Markdown, Open in GitHub/ChatGPT/Claude actions

@@ -9,8 +9,8 @@
  * Usage: bun run build.ts [--crate-dir <path>] [--skip-wasm] [--skip-site] [--parallel <n>]
  */
 
-import { existsSync, readdirSync, readFileSync } from "fs";
-import { join, resolve, basename, dirname } from "path";
+import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { join, resolve, basename, dirname, relative } from "path";
 import { mkdir, cp, rm, writeFile, readFile } from "fs/promises";
 import { $ } from "bun";
 
@@ -43,10 +43,61 @@ for (let i = 0; i < args.length; i++) {
 crateDir = resolve(crateDir);
 siteDir = resolve(siteDir);
 const demosDir = join(siteDir, "static", "demos");
+const GITHUB_RECOMMENDED_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+const GITHUB_HARD_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 
 console.log("=== bevy-crate-docs build ===");
 console.log(`  Crate: ${crateDir}`);
 console.log(`  Site:  ${siteDir}`);
+
+type BundleFileSize = {
+  relativePath: string;
+  sizeBytes: number;
+};
+
+function formatMiB(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
+}
+
+function collectFiles(dir: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectFiles(fullPath));
+    } else if (entry.isFile()) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+function inspectBundleFiles(bundlePath: string): {
+  recommended: BundleFileSize[];
+  hardLimit: BundleFileSize[];
+} {
+  const recommended: BundleFileSize[] = [];
+  const hardLimit: BundleFileSize[] = [];
+
+  for (const filePath of collectFiles(bundlePath)) {
+    const sizeBytes = statSync(filePath).size;
+    const item = {
+      relativePath: relative(bundlePath, filePath),
+      sizeBytes,
+    };
+
+    if (sizeBytes > GITHUB_RECOMMENDED_FILE_SIZE_BYTES) {
+      recommended.push(item);
+    }
+    if (sizeBytes > GITHUB_HARD_FILE_SIZE_BYTES) {
+      hardLimit.push(item);
+    }
+  }
+
+  recommended.sort((a, b) => b.sizeBytes - a.sizeBytes);
+  hardLimit.sort((a, b) => b.sizeBytes - a.sizeBytes);
+  return { recommended, hardLimit };
+}
 
 // ── 1. Validate & extract crate metadata ────────────────────────────────────
 
@@ -173,6 +224,7 @@ console.log(`  Docs: ${docs.length > 0 ? docs.join(", ") : "none"}`);
 
 if (!skipWasm && examples.length > 0) {
   console.log(`\n--- Building WASM demos (${examples.length} examples, sequential) ---`);
+  await rm(demosDir, { recursive: true, force: true });
   await mkdir(demosDir, { recursive: true });
 
   for (const example of examples) {
@@ -214,6 +266,24 @@ if (!skipWasm && examples.length > 0) {
 
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
       if (bundlePath) {
+        const bundleFiles = inspectBundleFiles(bundlePath);
+        for (const file of bundleFiles.recommended) {
+          console.warn(
+            `    [WARN] demos/${example}/${file.relativePath} is ${formatMiB(file.sizeBytes)} and exceeds GitHub's recommended 50 MiB limit`
+          );
+        }
+        if (bundleFiles.hardLimit.length > 0) {
+          console.warn(
+            `    [WARN] Skipping ${example}: bundle contains file(s) that exceed GitHub's 100 MiB hard limit`
+          );
+          for (const file of bundleFiles.hardLimit) {
+            console.warn(
+              `    [WARN]   demos/${example}/${file.relativePath} -> ${formatMiB(file.sizeBytes)}`
+            );
+          }
+          continue;
+        }
+
         const dest = join(demosDir, example);
         await rm(dest, { recursive: true, force: true });
         await cp(bundlePath, dest, { recursive: true });
@@ -236,6 +306,13 @@ if (!skipWasm && examples.length > 0) {
   console.log("\n--- Skipping WASM builds ---");
 }
 
+const availableExamples = !skipWasm && examples.length > 0
+  ? readdirSync(demosDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
+  : undefined;
+
 // ── 3. Generate manifest.json ───────────────────────────────────────────────
 
 console.log("\n--- Generating manifest.json ---");
@@ -250,6 +327,7 @@ const manifest = {
   crate_dir: crateDir,
   docs,
   examples,
+  availableExamples,
 };
 
 await writeFile(

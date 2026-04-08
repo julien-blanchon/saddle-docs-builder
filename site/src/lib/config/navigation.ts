@@ -7,6 +7,12 @@ import manifest from '../manifest.json';
  */
 function buildNavigation(): DocItem[] {
 	const nav: DocItem[] = [];
+	const manifestWithExamples = manifest as {
+		examples?: string[];
+		availableExamples?: string[];
+	};
+	const demoNames: string[] =
+		manifestWithExamples.availableExamples ?? manifestWithExamples.examples ?? [];
 
 	// Home page (README)
 	nav.push({
@@ -31,8 +37,8 @@ function buildNavigation(): DocItem[] {
 	}
 
 	// Demo pages from examples
-	if (manifest.examples && manifest.examples.length > 0) {
-		const demoItems: DocItem[] = manifest.examples.map((example: string) => ({
+	if (demoNames.length > 0) {
+		const demoItems: DocItem[] = demoNames.map((example: string) => ({
 			slug: `demo/${example}`,
 			name: example
 				.replace(/[-_]/g, ' ')

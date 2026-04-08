@@ -2,7 +2,14 @@ import type { PageLoad, EntryGenerator } from './$types';
 import manifest from '$lib/manifest.json';
 
 export const entries: EntryGenerator = () => {
-	return (manifest.examples ?? []).map((name: string) => ({ name }));
+	const manifestWithExamples = manifest as {
+		examples?: string[];
+		availableExamples?: string[];
+	};
+
+	return (manifestWithExamples.availableExamples ?? manifestWithExamples.examples ?? []).map(
+		(name: string) => ({ name })
+	);
 };
 
 export const load: PageLoad = ({ params }) => {
