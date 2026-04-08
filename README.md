@@ -102,3 +102,10 @@ jobs:
 - [marked](https://marked.js.org) (markdown parsing)
 - [Bun](https://bun.sh) (build script runtime)
 - [bevy CLI](https://github.com/TheBevyFlock/bevy_cli) (WASM bundling)
+
+## Testing Note
+
+This crate intentionally does **not** ship an `examples/lab` Bevy runtime app.
+`saddle-docs-builder` is documentation/build tooling, so its verification surface is build and site-generation behavior rather than in-engine visual E2E.
+
+When changing this crate, validate it by running the build pipeline against representative crate inputs (including crates with `README.md`, `docs/`, and `examples/lab/`) instead of trying to add a visual lab app here.
